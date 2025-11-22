@@ -1,3 +1,4 @@
+from difflib import SequenceMatcher
 import importlib
 from typing import Optional
 
@@ -6,6 +7,16 @@ import pandas as pd
 import utils
 importlib.reload(utils)
 from utils import logger
+
+
+def calculate_similarity(word: str, target: str) -> float:
+    """
+    Calculate similarity ratio (float between 0 and 1: higher score = better match) between two strings.
+    :param word: The string to be compared.
+    :param target: The string it should be.
+    :return: The similarity ratio score.
+    """
+    return SequenceMatcher(None, word.lower(), target.lower()).ratio()
 
 
 def create_df(
@@ -34,8 +45,9 @@ def create_df(
         df = pd.DataFrame(source[columns])
 
         # Convert strings to lowercase and trim whitespace.
-        df.map(lambda x: x.lower().strip() if isinstance(x, str) else x)
-        df.columns = df.columns.str.lower().str.strip()
+        df[df.select_dtypes(include="object").columns] = (
+            df.select_dtypes(include="object").apply(lambda col: col.str.strip().str.lower())
+        )
 
         if id_column:
             # Create ID column.
@@ -57,3 +69,26 @@ def create_df(
     except Exception as exception:
         logger.error(f'An unexpected error occurred: {exception}')
         return None
+
+def match_string(word: pd.DataFrame, targets: list) -> str:
+    """
+    Match a string with possible typos to a string in a target list based on similarity ratio score.
+    :param word: The string to be compared.
+    :param targets: The target strings to compare to.
+    :return: The best possible match.
+    """
+
+    # Classify as 'not specified' if value is null.
+    if pd.isna(word):
+        return 'n/a'
+
+    # Make sure it's a string.
+    word = str(word)
+
+    # Calculate similarity scores for each target.
+    scores = {target: calculate_similarity(word, target) for target in targets}
+
+    # Return the target with most similarity.
+    target_match = max(scores, key=scores.get)
+
+    return target_match
