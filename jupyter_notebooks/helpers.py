@@ -70,7 +70,7 @@ def create_df(
         logger.error(f'An unexpected error occurred: {exception}')
         return None
 
-def match_string(word: pd.DataFrame, targets: list) -> str:
+def match_string(word: str, targets: list) -> str:
     """
     Match a string with possible typos to a string in a target list based on similarity ratio score.
     :param word: The string to be compared.
