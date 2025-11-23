@@ -49,6 +49,9 @@ def create_df(
             df.select_dtypes(include="object").apply(lambda col: col.str.strip().str.lower())
         )
 
+        # Drop dupes and reset index.
+        df = df.drop_duplicates().reset_index(drop=True)
+
         if id_column:
             # Create ID column.
             df[f'{id_column}_id'] = df.index + 1
