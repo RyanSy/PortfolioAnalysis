@@ -49,7 +49,7 @@ def create_df(
             df.select_dtypes(include="object").apply(lambda col: col.str.strip().str.lower())
         )
 
-        # Drop dupes and rows with nan/null values and reset index.
+        # Drop dupes.
         og_length = len(df)
         df = df.drop_duplicates().reset_index(drop=True)
         logger.info(f'{og_length - len(df)} duplicate rows dropped.')
