@@ -1,4 +1,3 @@
-from datetime import datetime
 from difflib import SequenceMatcher
 import importlib
 from typing import Optional
@@ -160,9 +159,29 @@ def match_string(word: str, targets: list) -> str:
     return target_match
 
 
+def arrange_and_convert_columns(df: pd.DataFrame, columns: list, dtype_map: dict, df_name: str) -> pd.DataFrame:
+    """
+    Reorder columns and convert to specified dtypes.
+    :param df: Dataframe to prepare.
+    :param columns: Columns in the proper order for db insertion.
+    :param dtype_map: Mapping from column names to dtypes.
+    :param df_name: Name of the dataframe to arrange.
+    :return: Dataframe with reordered columns and converted dtypes
+    """
+    # Order columns according to schema
+    df = df[columns]
+
+    # Convert to appropriate dtypes
+    df = df.astype(dtype_map)
+
+    logger.info(f'Columns in {df_name} arranged and data converted to appropriate dtypes.')
+
+    return df
+
+
 def validate_ticker_format(df: pd.DataFrame) -> pd.Series:
     """
-    Validate ticker_symbol column values against pattern: 3 letters + 3 digits (i.e. stk182).
+    Validates ticker_symbol column values against pattern: 3 letters + 3 digits (i.e. stk182).
     :param df: The dataframe with ticker column to be validated.
     :return: Boolean.
     """
