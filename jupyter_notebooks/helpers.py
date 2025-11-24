@@ -1,3 +1,4 @@
+from datetime import datetime
 from difflib import SequenceMatcher
 import importlib
 from typing import Optional
@@ -24,8 +25,8 @@ def create_df(
         source: pd.DataFrame,
         columns: list,
         subset: Optional[str] = None,
-        id_column: Optional[str] = None,
-        sort_column: Optional[str] = None
+        sort_column: Optional[str] = None,
+        id_column: Optional[str] = None
 ) -> pd.DataFrame | None:
     """
     Creates a new dataframe using data from another dataframe's column(s).
@@ -33,8 +34,8 @@ def create_df(
     :param source: Source dataframe for data.
     :param columns: List of column names.
     :param subset: (Optional) Name of the column to use for subsetting when dropping NaN values.
-    :param id_column: (Optional) Name of the column to use as ID column.
     :param sort_column: (Optional) Name of the column to use for sorting.
+    :param id_column: (Optional) Name of the column to use as ID column.
     :return: A new pandas DataFrame.
     """
     logger.info(f'Creating {name}...')
@@ -61,6 +62,10 @@ def create_df(
             df = df.dropna()
             logger.info(f'{df_na - len(df)} rows with NaN or null values dropped.')
 
+        if sort_column:
+            # Sort by sort column.
+            df = df.sort_values(by=sort_column).reset_index(drop=True)
+
         if id_column:
             # Create ID column.
             df[f'{id_column}_id'] = df.index + 1
@@ -68,19 +73,33 @@ def create_df(
             # Make sure ID column is Int64.
             df[f'{id_column}_id'] = df[f'{id_column}_id'].astype('Int64')
 
-        if sort_column:
-            # Drop dupes.
-            df = df.drop_duplicates(subset=sort_column, keep='first')
-
-            # Sort by sort column.
-            df = df.sort_values(by=sort_column).reset_index(drop=True)
-
         logger.info(f'{name} dataframe with {df.shape[0]} rows and {df.shape[1]} columns created.')
 
         return df
     except Exception as exception:
         logger.error(f'An unexpected error occurred: {exception}')
         return None
+
+
+def drop_future_dates(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Drop future dates from a dataframe.
+    :param df: dataframe with future dates to be dropped.
+    :param column: name of the column with future dates to be dropped.
+    :return: Updated dataframe with no future dates.
+    """
+    logger.info(f'Dropping future dates from {df}["{column}"]...')
+
+    # Convert column to datetime.
+    df[column] = pd.to_datetime(df[column], errors='coerce')
+
+    # Remove future dates (keep only dates <= today).
+    df = df[df[column].copy().values <= pd.Timestamp.now()]
+
+    logger.info(f'Future dates dropped.')
+
+    return df
+
 
 
 def match_string(word: str, targets: list) -> str:
