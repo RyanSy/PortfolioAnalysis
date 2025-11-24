@@ -23,20 +23,19 @@ def create_df(
         name: str,
         source: pd.DataFrame,
         columns: list,
+        subset: Optional[str] = None,
         id_column: Optional[str] = None,
-        sort_column: Optional[str] = None,
+        sort_column: Optional[str] = None
 ) -> pd.DataFrame | None:
-    """Creates a new dataframe using data from another dataframe's column(s).
-
-    Args:
-        name: Name of the new dataframe.
-        id_column (optional): Name of the column to use as ID column.
-        sort_column (optional): Name of the column to use for sorting.
-        source: Source dataframe for data.
-        columns: List of column names.
-
-    Returns:
-        A new pandas DataFrame.
+    """
+    Creates a new dataframe using data from another dataframe's column(s).
+    :param name: Name of the new dataframe.
+    :param source: Source dataframe for data.
+    :param columns: List of column names.
+    :param subset: (Optional) Name of the column to use for subsetting when dropping NaN values.
+    :param id_column: (Optional) Name of the column to use as ID column.
+    :param sort_column: (Optional) Name of the column to use for sorting.
+    :return: A new pandas DataFrame.
     """
     logger.info(f'Creating {name}...')
 
@@ -52,6 +51,15 @@ def create_df(
         og_length = len(df)
         df = df.drop_duplicates().reset_index(drop=True)
         logger.info(f'{og_length - len(df)} duplicate rows dropped.')
+
+        # Drop rows with NaN or null values if dropna == True.
+        df_na = len(df)
+        if subset:
+            df = df.dropna(subset=subset)
+            logger.info(f'{df_na - len(df)} rows where {subset} column contains NaN or null values dropped.')
+        else:
+            df = df.dropna()
+            logger.info(f'{df_na - len(df)} rows with NaN or null values dropped.')
 
         if id_column:
             # Create ID column.
@@ -99,10 +107,11 @@ def match_string(word: str, targets: list) -> str:
     return target_match
 
 
-def validate_ticker_format(df):
+def validate_ticker_format(df: pd.DataFrame) -> pd.Series:
     """
-    Validate ticker_symbol column values against pattern: 3 letters + 3 digits
-    Returns summary and invalid values
+    Validate ticker_symbol column values against pattern: 3 letters + 3 digits (i.e. stk182).
+    :param df: The dataframe with ticker column to be validated.
+    :return: Boolean.
     """
     pattern = r'^[a-z]{3}\d{3}$'
 
