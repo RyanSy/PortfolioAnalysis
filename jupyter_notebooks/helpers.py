@@ -26,7 +26,8 @@ def create_df(
         columns: list,
         subset: Optional[str] = None,
         sort_column: Optional[str] = None,
-        id_column: Optional[str] = None
+        id_column: Optional[str] = None,
+        date_column: Optional[str] = None
 ) -> pd.DataFrame | None:
     """
     Creates a new dataframe using data from another dataframe's column(s).
@@ -36,6 +37,7 @@ def create_df(
     :param subset: (Optional) Name of the column to use for subsetting when dropping NaN values.
     :param sort_column: (Optional) Name of the column to use for sorting.
     :param id_column: (Optional) Name of the column to use as ID column.
+    :param date_column: (Optional) Name of the column containing a date.
     :return: A new pandas DataFrame.
     """
     logger.info(f'Creating {name}...')
@@ -73,6 +75,9 @@ def create_df(
             # Make sure ID column is Int64.
             df[f'{id_column}_id'] = df[f'{id_column}_id'].astype('Int64')
 
+        if date_column:
+            drop_future_dates(df, date_column)
+
         logger.info(f'{name} dataframe with {df.shape[0]} rows and {df.shape[1]} columns created.')
 
         return df
@@ -88,18 +93,18 @@ def drop_future_dates(df: pd.DataFrame, column: str) -> pd.DataFrame:
     :param column: name of the column with future dates to be dropped.
     :return: Updated dataframe with no future dates.
     """
-    logger.info(f'Dropping future dates from {df}["{column}"]...')
+    logger.info('Dropping future dates...')
 
     # Convert column to datetime.
     df[column] = pd.to_datetime(df[column], errors='coerce')
 
     # Remove future dates (keep only dates <= today).
+    df_before = len(df)
     df = df[df[column].copy().values <= pd.Timestamp.now()]
 
-    logger.info(f'Future dates dropped.')
+    logger.info(f'{df_before - len(df)} future dates dropped.')
 
     return df
-
 
 
 def match_string(word: str, targets: list) -> str:
