@@ -108,29 +108,27 @@ def drop_future_dates(df: pd.DataFrame, column: str) -> pd.DataFrame:
 
 
 def map_id_column(source_df: pd.DataFrame,
-                  source_name_col: str,
-                  source_id_col: str,
+                  source_column: str,
+                  source_id_column: str,
                   target_df: pd.DataFrame,
-                  target_name_col: str
+                  target_column: str
 ) -> pd.DataFrame | None:
     """
     Maps values to corresponding IDs and drops the original name column.
     :param source_df: DataFrame containing the mapping from value to ID.
-    :param source_name_col: Name of the column in `source_df` with the values to map.
-    :param source_id_col: Name of the ID column in `source_df` to map to.
+    :param source_column: Column in `source_df` with the values to map.
+    :param source_id_column: ID column in `source_df` to map to.
     :param target_df: DataFrame to apply the mapping to.
-    :param target_name_col: Name of the column in `target_df` containing the names to be mapped.
-
-    Returns:
-        The target DataFrame with the new ID column added and the original name column dropped.
+    :param target_column: Column in `target_df` containing the names to be mapped.
+    :return: The target DataFrame with the new ID column added and the original name column dropped.
     """
     try:
-        logger.info(f'Mapping {source_id_col}...')
-        source_df = source_df.drop_duplicates(subset=[source_name_col])
-        mapping = source_df.set_index(source_name_col)[source_id_col]
-        new_id_col_name = source_id_col  # Use the actual ID column name
-        target_df[new_id_col_name] = target_df[target_name_col].map(mapping)
-        target_df = target_df.drop(columns=[target_name_col])
+        logger.info(f'Mapping {source_id_column}...')
+        source_df = source_df.drop_duplicates(subset=[source_column])
+        mapping = source_df.set_index(source_column)[source_id_column]
+        new_id_col_name = source_id_column  # Use the actual ID column name
+        target_df[new_id_col_name] = target_df[target_column].map(mapping)
+        target_df = target_df.drop(columns=[target_column])
         logger.info('Column mapping completed.')
         return target_df
     except Exception as exception:
