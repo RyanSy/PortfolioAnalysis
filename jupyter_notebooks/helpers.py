@@ -45,9 +45,8 @@ def create_df(
         df = pd.DataFrame(source[columns])
 
         # Convert strings to lowercase and trim whitespace.
-        df[df.select_dtypes(include="object").columns] = (
-            df.select_dtypes(include="object").apply(lambda col: col.str.strip().str.lower())
-        )
+        for col in df.select_dtypes(include="object"):
+            df[col] = df[col].str.strip().str.lower()
 
         # Drop dupes.
         og_length = len(df)
@@ -68,12 +67,13 @@ def create_df(
             # Sort by sort column.
             df = df.sort_values(by=sort_column).reset_index(drop=True)
 
-        logger.info(f'{name} created.')
+        logger.info(f'{name} dataframe with {df.shape[0]} rows and {df.shape[1]} columns created.')
 
         return df
     except Exception as exception:
         logger.error(f'An unexpected error occurred: {exception}')
         return None
+
 
 def match_string(word: str, targets: list) -> str:
     """
@@ -97,3 +97,34 @@ def match_string(word: str, targets: list) -> str:
     target_match = max(scores, key=scores.get)
 
     return target_match
+
+
+def validate_ticker_format(df):
+    """
+    Validate ticker_symbol column values against pattern: 3 letters + 3 digits
+    Returns summary and invalid values
+    """
+    pattern = r'^[a-z]{3}\d{3}$'
+
+    # Check pattern match (handle NaN)
+    is_valid = df['ticker_symbol'].str.match(pattern, na=False)
+
+    # Summary
+    total = len(df)
+    valid = is_valid.sum()
+    invalid = (~is_valid).sum()
+    null = df['ticker_symbol'].isna().sum()
+
+    print(f"Total rows: {total}")
+    print(f"Valid format: {valid} ({valid/total*100:.1f}%)")
+    print(f"Invalid format: {invalid} ({invalid/total*100:.1f}%)")
+    print(f"Null values: {null}")
+
+    # Show invalid values
+    if invalid > 0:
+        invalid_values = df.loc[~is_valid, 'ticker_symbol'].unique()
+        print(f"\nInvalid ticker symbols (unique values): {len(invalid_values)}")
+        for val in invalid_values:
+            print(f" - {val}")
+
+    return is_valid
