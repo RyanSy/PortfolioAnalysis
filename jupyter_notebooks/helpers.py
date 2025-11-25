@@ -1,6 +1,6 @@
 from difflib import SequenceMatcher
 import importlib
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
 
@@ -38,11 +38,56 @@ def calculate_similarity(word: str, target: str) -> float:
     return SequenceMatcher(None, word.lower(), target.lower()).ratio()
 
 
+def clean_tickers(df: pd.DataFrame,
+                  column: str = "ticker_symbol",
+                  min_val: int = 1,
+                  max_val: int = 500) -> pd.DataFrame:
+    """
+    Cleans a DataFrame by dropping rows with invalid tickers.
+    Valid tickers must match 'stkNNN' (1–3 digits) and fall within [min_val, max_val].
+    Normalizes valid tickers to 'stkNNN' format (zero-padded).
+    :param df: DataFrame containing a ticker column to clean.
+    :param column: String, Name of the column containing ticker strings, default is "ticker_symbol".
+    :param min_val: int, default 1, minimum valid numeric value for ticker.
+    :param max_val: int, default 500, maximum valid numeric value for ticker.
+    :return: A cleaned DataFrame containing only valid tickers, normalized to 'stkNNN'.
+    """
+    # Normalize case and whitespace.
+    df[column] = df[column].str.strip().str.lower()
+
+    # Strict regex mask: only 'stk' followed by 1–3 digits.
+    regex_mask = df[column].str.match(r'^stk\d{1,3}$')
+
+    # Extract digits for valid rows.
+    extracted = df[column].str.extract(r'^stk(\d{1,3})$', expand=False)
+    numeric = pd.to_numeric(extracted, errors='coerce')
+
+    # Apply numeric range filter.
+    range_mask = (numeric >= min_val) & (numeric <= max_val)
+
+    # Final mask.
+    valid_mask = regex_mask & range_mask
+
+    # Keep only valid rows.
+    valid_df = df.loc[valid_mask].copy()
+
+    # Normalize ticker symbols to 'stkNNN'.
+    valid_df[column] = 'stk' + numeric[valid_mask].astype(int).astype(str).str.zfill(3)
+
+    # Number of rows dropped.
+    rows_dropped = len(df.loc[~valid_mask].copy())
+
+    logger.info(
+        f'{rows_dropped} rows with invalid ticker symbols dropped.'
+    )
+    return valid_df
+
+
 def create_df(
         name: str,
         source: pd.DataFrame,
         columns: list,
-        subset: Optional[str] = None,
+        subset: Optional[List[str]] = None,
         sort_column: Optional[str] = None,
         id_column: Optional[str] = None,
         date_column: Optional[str] = None
@@ -52,7 +97,7 @@ def create_df(
     :param name: Name of the new dataframe.
     :param source: Source dataframe for data.
     :param columns: List of column names.
-    :param subset: (Optional) Name of the column to use for subsetting when dropping NaN values.
+    :param subset: (Optional) List of column names to use for subsetting when dropping NaN values.
     :param sort_column: (Optional) Name of the column to use for sorting.
     :param id_column: (Optional) Name of the column to use as ID column.
     :param date_column: (Optional) Name of the column containing a date.
