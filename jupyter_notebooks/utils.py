@@ -1,8 +1,11 @@
 import logging
 import os
+
 import sys
+from io import StringIO
 
 from dotenv import load_dotenv
+import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 
@@ -27,6 +30,58 @@ DB_NAME = os.getenv('DB_NAME')
 DB_URL = f'{DB_DIALECT}+{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 
 engine = create_engine(DB_URL)
+
+
+def insert_table_data(source: pd.DataFrame, schema: str, table: str) -> None:
+    """
+    Insert dataframe data into a postgres table.
+    The function uses `COPY FROM STDIN` for efficient insertion.
+    :param source: Dataframe to insert data into.
+    :param schema: Database schema.
+    :param table: Table to insert data into.
+    :return: None.
+    """
+    logger.info(f'Opening raw db connection, inserting data into {table}...')
+
+    raw_conn = None
+    cursor = None
+
+    try:
+        raw_conn = engine.raw_connection()
+        cursor = raw_conn.cursor()
+        copy_sql = f'COPY {schema}.{table} FROM STDIN WITH (FORMAT CSV, HEADER FALSE)'
+        output = StringIO()
+        source.to_csv(output, sep=',', header=False, index=False)
+        output.seek(0)
+        cursor.copy_expert(sql=copy_sql, file=output)
+        raw_conn.commit()
+        logger.info(f'Dataframe successfully copied to the {table} table.')
+        return None
+    except IntegrityError as integrity_error:
+        logger.error(f'Integrity constraint violation: {integrity_error.orig}')
+        if raw_conn:
+            raw_conn.rollback()
+        return None
+    except OperationalError as operational_error:
+        logger.error(f'Database operational error: {operational_error.orig}')
+        if raw_conn:
+            raw_conn.rollback()
+        return None
+    except DBAPIError as dbapi_error:
+        logger.error(f'A general database API error occurred: {dbapi_error.orig}')
+        if raw_conn:
+            raw_conn.rollback()
+            return None
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred: {exception}')
+        if raw_conn:
+            raw_conn.rollback()
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if raw_conn:
+            raw_conn.close()
 
 
 def run_sql(log_msg :str, sql_query: str, data=None) -> None:
