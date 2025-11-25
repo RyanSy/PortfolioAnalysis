@@ -170,6 +170,51 @@ def drop_future_dates(df: pd.DataFrame, column: str) -> pd.DataFrame:
     return df
 
 
+def filter_account_ids(
+    df: pd.DataFrame,
+    df2: pd.DataFrame,
+    column: str = "account_id"
+) -> pd.DataFrame:
+    """
+    Filter rows in a DataFrame based on membership in another DataFrame.
+
+    This function keeps only rows in `df` where the specified column's
+    values are present in the same column of `df2`.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame containing account positions.
+    df2 : pd.DataFrame
+        Reference DataFrame containing valid account IDs.
+    column : str, optional
+        Column name to apply the filter on (default is 'account_id').
+
+    Returns
+    -------
+    pd.DataFrame
+        A new DataFrame with rows retained only if the column value
+        exists in df2[column].
+
+    Raises
+    ------
+    ValueError
+        If the specified column does not exist in either DataFrame.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in df.")
+    if column not in df2.columns:
+        raise ValueError(f"Column '{column}' not found in df2.")
+
+    valid_ids = set(df2[column].unique())
+    filtered_df = df[df[column].isin(valid_ids)].copy()
+
+    logger.info(f"Rows where '{column}' not in df2 dropped.")
+
+    return filtered_df
+
+
+
 def map_id_column(source_df: pd.DataFrame,
                   source_column: str,
                   source_id_column: str,
