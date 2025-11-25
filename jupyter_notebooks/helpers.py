@@ -21,15 +21,20 @@ def arrange_and_convert_columns(df: pd.DataFrame, columns: list, dtype_map: dict
     Returns:
         Dataframe with reordered columns and converted dtypes.
     """
-    # Order columns according to schema
-    df = df[columns]
+    try:
+        # Order columns according to schema.
+        df = df[columns]
 
-    # Convert to appropriate dtypes
-    df = df.astype(dtype_map)
+        # Convert to appropriate dtypes.
+        df = df.astype(dtype_map)
 
-    logger.info(f'Columns in {df_name} arranged and data converted to appropriate dtypes.')
+        logger.info(f'Columns in {df_name} arranged and data converted to appropriate dtypes.')
 
-    return df
+        return df
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in arrange_and_convert_columns for {df_name}: {exception}')
+        # Re-raise the exception, as returning an incorrectly structured DataFrame can break subsequent steps.
+        raise
 
 
 def calculate_similarity(word: str, target: str) -> float:
@@ -46,7 +51,11 @@ def calculate_similarity(word: str, target: str) -> float:
     Returns:
         The similarity ratio score.
     """
-    return SequenceMatcher(None, word.lower(), target.lower()).ratio()
+    try:
+        return SequenceMatcher(None, word.lower(), target.lower()).ratio()
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in calculate_similarity: {exception}')
+        return 0.0
 
 
 def clean_tickers(df: pd.DataFrame,
@@ -70,35 +79,40 @@ def clean_tickers(df: pd.DataFrame,
     Returns:
         A cleaned DataFrame containing only valid tickers, normalized to 'stkNNN'.
     """
-    # Normalize case and whitespace.
-    df[column] = df[column].str.strip().str.lower()
+    try:
+        # Normalize case and whitespace.
+        df[column] = df[column].str.strip().str.lower()
 
-    # Strict regex mask: only 'stk' followed by 1–3 digits.
-    regex_mask = df[column].str.match(r'^stk\d{1,3}$')
+        # Strict regex mask: only 'stk' followed by 1–3 digits.
+        regex_mask = df[column].str.match(r'^stk\d{1,3}$')
 
-    # Extract digits for valid rows.
-    extracted = df[column].str.extract(r'^stk(\d{1,3})$', expand=False)
-    numeric = pd.to_numeric(extracted, errors='coerce')
+        # Extract digits for valid rows.
+        extracted = df[column].str.extract(r'^stk(\d{1,3})$', expand=False)
+        numeric = pd.to_numeric(extracted, errors='coerce')
 
-    # Apply numeric range filter.
-    range_mask = (numeric >= min_val) & (numeric <= max_val)
+        # Apply numeric range filter.
+        range_mask = (numeric >= min_val) & (numeric <= max_val)
 
-    # Final mask.
-    valid_mask = regex_mask & range_mask
+        # Final mask.
+        valid_mask = regex_mask & range_mask
 
-    # Keep only valid rows.
-    valid_df = df.loc[valid_mask].copy()
+        # Keep only valid rows.
+        valid_df = df.loc[valid_mask].copy()
 
-    # Normalize ticker symbols to 'stkNNN'.
-    valid_df[column] = 'stk' + numeric[valid_mask].astype(int).astype(str).str.zfill(3)
+        # Normalize ticker symbols to 'stkNNN'.
+        valid_df[column] = 'stk' + numeric[valid_mask].astype(int).astype(str).str.zfill(3)
 
-    # Number of rows dropped.
-    rows_dropped = len(df.loc[~valid_mask].copy())
+        # Number of rows dropped.
+        rows_dropped = len(df.loc[~valid_mask].copy())
 
-    logger.info(
-        f'{rows_dropped} rows with invalid ticker symbols dropped.'
-    )
-    return valid_df
+        logger.info(
+            f'{rows_dropped} rows with invalid ticker symbols dropped.'
+        )
+        return valid_df
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in clean_tickers: {exception}')
+        # Return the original DataFrame in case of unexpected error.
+        return df
 
 
 def create_df(
@@ -195,18 +209,23 @@ def drop_future_dates(df: pd.DataFrame, column: str) -> pd.DataFrame:
     Returns:
         Updated DataFrame with no future dates.
     """
-    logger.info('Dropping future dates...')
+    try:
+        logger.info('Dropping future dates...')
 
-    # Convert column to datetime.
-    df[column] = pd.to_datetime(df[column], errors='coerce')
+        # Convert column to datetime.
+        df[column] = pd.to_datetime(df[column], errors='coerce')
 
-    # Remove future dates (keep only dates <= today).
-    df_before = len(df)
-    df = df[df[column].copy().values <= pd.Timestamp.now()]
+        # Remove future dates (keep only dates <= today).
+        df_before = len(df)
+        df = df[df[column].copy().values <= pd.Timestamp.now()]
 
-    logger.info(f'{df_before - len(df)} future dates dropped.')
+        logger.info(f'{df_before - len(df)} future dates dropped.')
 
-    return df
+        return df
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in drop_future_dates: {exception}')
+        # Return the original DataFrame in case of unexpected error.
+        return df
 
 
 def filter_account_ids(
@@ -232,17 +251,25 @@ def filter_account_ids(
     Raises:
         ValueError: If the specified column does not exist in either DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f'Column "{column}" not found in dataframe to be filtered.')
-    if column not in df2.columns:
-        raise ValueError(f'Column "{column}" not found in reference dataframe.')
+    try:
+        if column not in df.columns:
+            raise ValueError(f'Column "{column}" not found in dataframe to be filtered.')
+        if column not in df2.columns:
+            raise ValueError(f'Column "{column}" not found in reference dataframe.')
 
-    valid_ids = set(df2[column].unique())
-    filtered_df = df[df[column].isin(valid_ids)].copy()
+        valid_ids = set(df2[column].unique())
+        filtered_df = df[df[column].isin(valid_ids)].copy()
 
-    logger.info(f'Rows where {column} not in reference dataframe dropped.')
+        logger.info(f'Rows where {column} not in reference dataframe dropped.')
 
-    return filtered_df
+        return filtered_df
+    except ValueError:
+        # Re-raise the ValueError as it's a specific, expected failure condition.
+        raise
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in filter_account_ids: {exception}')
+        # Return the original DataFrame in case of unexpected error.
+        return df
 
 
 def map_id_column(source_df: pd.DataFrame,
@@ -270,7 +297,7 @@ def map_id_column(source_df: pd.DataFrame,
         logger.info(f'Mapping {source_id_column}...')
         source_df = source_df.drop_duplicates(subset=[source_column])
         mapping = source_df.set_index(source_column)[source_id_column]
-        new_id_col_name = source_id_column  # Use the actual ID column name
+        new_id_col_name = source_id_column  # Use the actual ID column name.
         target_df[new_id_col_name] = target_df[target_column].map(mapping)
         target_df = target_df.drop(columns=[target_column])
         logger.info('Column mapping completed.')
@@ -294,21 +321,24 @@ def match_string(word: str, targets: list) -> str:
     Returns:
         The target string with the best possible match, or 'n/a'.
     """
+    try:
+        # Classify as 'not specified' if value is null.
+        if pd.isna(word):
+            return 'n/a'
 
-    # Classify as 'not specified' if value is null.
-    if pd.isna(word):
+        # Make sure it's a string.
+        word = str(word)
+
+        # Calculate similarity scores for each target.
+        scores = {target: calculate_similarity(word, target) for target in targets}
+
+        # Return the target with most similarity.
+        target_match = max(scores, key=scores.get)
+
+        return target_match
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in match_string: {exception}')
         return 'n/a'
-
-    # Make sure it's a string.
-    word = str(word)
-
-    # Calculate similarity scores for each target.
-    scores = {target: calculate_similarity(word, target) for target in targets}
-
-    # Return the target with most similarity.
-    target_match = max(scores, key=scores.get)
-
-    return target_match
 
 
 def validate_ticker_format(df: pd.DataFrame) -> pd.Series:
@@ -326,27 +356,32 @@ def validate_ticker_format(df: pd.DataFrame) -> pd.Series:
         A boolean pandas Series indicating whether each row's 'ticker_symbol'
         matches the required format.
     """
-    pattern = r'^[a-z]{3}\d{3}$'
+    try:
+        pattern = r'^[a-z]{3}\d{3}$'
 
-    # Check pattern match (handle NaN)
-    is_valid = df['ticker_symbol'].str.match(pattern, na=False)
+        # Check pattern match (handle NaN).
+        is_valid = df['ticker_symbol'].str.match(pattern, na=False)
 
-    # Summary
-    total = len(df)
-    valid = is_valid.sum()
-    invalid = (~is_valid).sum()
-    null = df['ticker_symbol'].isna().sum()
+        # Summary.
+        total = len(df)
+        valid = is_valid.sum()
+        invalid = (~is_valid).sum()
+        null = df['ticker_symbol'].isna().sum()
 
-    print(f"Total rows: {total}")
-    print(f"Valid format: {valid} ({valid/total*100:.1f}%)")
-    print(f"Invalid format: {invalid} ({invalid/total*100:.1f}%)")
-    print(f"Null values: {null}")
+        print(f"Total rows: {total}")
+        print(f"Valid format: {valid} ({valid/total*100:.1f}%)")
+        print(f"Invalid format: {invalid} ({invalid/total*100:.1f}%)")
+        print(f"Null values: {null}")
 
-    # Show invalid values
-    if invalid > 0:
-        invalid_values = df.loc[~is_valid, 'ticker_symbol'].unique()
-        print(f"\nInvalid ticker symbols (unique values): {len(invalid_values)}")
-        for val in invalid_values:
-            print(f" - {val}")
+        # Show invalid values.
+        if invalid > 0:
+            invalid_values = df.loc[~is_valid, 'ticker_symbol'].unique()
+            print(f"\nInvalid ticker symbols (unique values): {len(invalid_values)}")
+            for val in invalid_values:
+                print(f" - {val}")
 
-    return is_valid
+        return is_valid
+    except Exception as exception:
+        logger.error(f'An unexpected error occurred in validate_ticker_format: {exception}')
+        # Return a Series of False in case of failure.
+        return pd.Series([False] * len(df))
