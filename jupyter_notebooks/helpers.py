@@ -10,12 +10,16 @@ from utils import logger
 
 def arrange_and_convert_columns(df: pd.DataFrame, columns: list, dtype_map: dict, df_name: str) -> pd.DataFrame:
     """
-    Reorder columns and convert to specified dtypes.
-    :param df: Dataframe to prepare.
-    :param columns: Columns in the proper order for db insertion.
-    :param dtype_map: Mapping from column names to dtypes.
-    :param df_name: Name of the dataframe to arrange.
-    :return: Dataframe with reordered columns and converted dtypes
+    Reorder columns and convert them to specified dtypes.
+
+    Args:
+        df: Dataframe to prepare.
+        columns: Columns in the proper order for database insertion.
+        dtype_map: Mapping from column names to dtypes.
+        df_name: Name of the dataframe to arrange (used for logging).
+
+    Returns:
+        Dataframe with reordered columns and converted dtypes.
     """
     # Order columns according to schema
     df = df[columns]
@@ -30,10 +34,17 @@ def arrange_and_convert_columns(df: pd.DataFrame, columns: list, dtype_map: dict
 
 def calculate_similarity(word: str, target: str) -> float:
     """
-    Calculate similarity ratio (float between 0 and 1: higher score = better match) between two strings.
-    :param word: The string to be compared.
-    :param target: The string it should be.
-    :return: The similarity ratio score.
+    Calculate similarity ratio between two strings.
+
+    The similarity score is a float between 0 and 1, where a higher score
+    indicates a better match. Comparison is case-insensitive.
+
+    Args:
+        word: The string to be compared.
+        target: The string it should be compared against.
+
+    Returns:
+        The similarity ratio score.
     """
     return SequenceMatcher(None, word.lower(), target.lower()).ratio()
 
@@ -43,14 +54,21 @@ def clean_tickers(df: pd.DataFrame,
                   min_val: int = 1,
                   max_val: int = 500) -> pd.DataFrame:
     """
-    Cleans a DataFrame by dropping rows with invalid tickers.
-    Valid tickers must match 'stkNNN' (1–3 digits) and fall within [min_val, max_val].
-    Normalizes valid tickers to 'stkNNN' format (zero-padded).
-    :param df: DataFrame containing a ticker column to clean.
-    :param column: String, Name of the column containing ticker strings, default is "ticker_symbol".
-    :param min_val: int, default 1, minimum valid numeric value for ticker.
-    :param max_val: int, default 500, maximum valid numeric value for ticker.
-    :return: A cleaned DataFrame containing only valid tickers, normalized to 'stkNNN'.
+    Cleans a DataFrame by dropping rows with invalid stock tickers.
+
+    Valid tickers must match the format 'stkNNN' (1–3 digits) and fall
+    within the range [min_val, max_val]. Valid tickers are normalized
+    to the 'stkNNN' format (zero-padded).
+
+    Args:
+        df: DataFrame containing a ticker column to clean.
+        column: Name of the column containing ticker strings.
+            Defaults to "ticker_symbol".
+        min_val: Minimum valid numeric value for the ticker. Defaults to 1.
+        max_val: Maximum valid numeric value for the ticker. Defaults to 500.
+
+    Returns:
+        A cleaned DataFrame containing only valid tickers, normalized to 'stkNNN'.
     """
     # Normalize case and whitespace.
     df[column] = df[column].str.strip().str.lower()
@@ -93,15 +111,30 @@ def create_df(
         date_column: Optional[str] = None
 ) -> pd.DataFrame | None:
     """
-    Creates a new dataframe using data from another dataframe's column(s).
-    :param name: Name of the new dataframe.
-    :param source: Source dataframe for data.
-    :param columns: List of column names.
-    :param subset: (Optional) List of column names to use for subsetting when dropping NaN values.
-    :param sort_column: (Optional) Name of the column to use for sorting.
-    :param id_column: (Optional) Name of the column to use as ID column.
-    :param date_column: (Optional) Name of the column containing a date.
-    :return: A new pandas DataFrame.
+    Creates a new DataFrame from column(s) of a source DataFrame, applying
+    cleaning steps and optional ID creation.
+
+    Steps include:
+    1. Lowercasing and trimming whitespace of object columns.
+    2. Dropping duplicate rows.
+    3. Dropping rows with NaN/null values.
+    4. Optional sorting.
+    5. Optional ID column creation (index + 1).
+    6. Optional future date dropping.
+
+    Args:
+        name: Name of the new dataframe (used for logging).
+        source: Source DataFrame for data.
+        columns: List of column names to include in the new DataFrame.
+        subset: Optional list of column names to use for subsetting when
+            dropping NaN values. If None, drops row if any column has NaN.
+        sort_column: Optional name of the column to use for sorting.
+        id_column: Optional name of the column used to create an ID column
+            (e.g., 'ticker' creates 'ticker_id').
+        date_column: Optional name of the column containing a date to check for future dates.
+
+    Returns:
+        A new pandas DataFrame or None if an error occurs.
     """
     logger.info(f'Creating {name}...')
 
@@ -151,10 +184,16 @@ def create_df(
 
 def drop_future_dates(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """
-    Drop future dates from a dataframe.
-    :param df: dataframe with future dates to be dropped.
-    :param column: name of the column with future dates to be dropped.
-    :return: Updated dataframe with no future dates.
+    Drop rows from a DataFrame where the specified date column contains a future date.
+
+    The column is first converted to datetime objects.
+
+    Args:
+        df: DataFrame with future dates to be dropped.
+        column: Name of the column with dates.
+
+    Returns:
+        Updated DataFrame with no future dates.
     """
     logger.info('Dropping future dates...')
 
@@ -179,40 +218,31 @@ def filter_account_ids(
     Filter rows in a DataFrame based on membership in another DataFrame.
 
     This function keeps only rows in `df` where the specified column's
-    values are present in the same column of `df2`.
+    values are present in the same column of `df2` (the reference DataFrame).
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame containing account positions.
-    df2 : pd.DataFrame
-        Reference DataFrame containing valid account IDs.
-    column : str, optional
-        Column name to apply the filter on (default is 'account_id').
+    Args:
+        df: Input DataFrame containing data to be filtered.
+        df2: Reference DataFrame containing valid values for the filter column.
+        column: Column name to apply the filter on. Defaults to 'account_id'.
 
-    Returns
-    -------
-    pd.DataFrame
+    Returns:
         A new DataFrame with rows retained only if the column value
-        exists in df2[column].
+        exists in `df2[column]`.
 
-    Raises
-    ------
-    ValueError
-        If the specified column does not exist in either DataFrame.
+    Raises:
+        ValueError: If the specified column does not exist in either DataFrame.
     """
     if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in df.")
+        raise ValueError(f'Column "{column}" not found in dataframe to be filtered.')
     if column not in df2.columns:
-        raise ValueError(f"Column '{column}' not found in df2.")
+        raise ValueError(f'Column "{column}" not found in reference dataframe.')
 
     valid_ids = set(df2[column].unique())
     filtered_df = df[df[column].isin(valid_ids)].copy()
 
-    logger.info(f"Rows where '{column}' not in df2 dropped.")
+    logger.info(f'Rows where {column} not in reference dataframe dropped.')
 
     return filtered_df
-
 
 
 def map_id_column(source_df: pd.DataFrame,
@@ -222,13 +252,19 @@ def map_id_column(source_df: pd.DataFrame,
                   target_column: str
 ) -> pd.DataFrame | None:
     """
-    Maps values to corresponding IDs and drops the original name column.
-    :param source_df: DataFrame containing the mapping from value to ID.
-    :param source_column: Column in `source_df` with the values to map.
-    :param source_id_column: ID column in `source_df` to map to.
-    :param target_df: DataFrame to apply the mapping to.
-    :param target_column: Column in `target_df` containing the names to be mapped.
-    :return: The target DataFrame with the new ID column added and the original name column dropped.
+    Maps values in a target DataFrame column to corresponding IDs from a source DataFrame,
+    and then drops the original value column from the target DataFrame.
+
+    Args:
+        source_df: DataFrame containing the mapping from value to ID.
+        source_column: Column in `source_df` with the values to map (keys).
+        source_id_column: ID column in `source_df` to map to (values).
+        target_df: DataFrame to apply the mapping to.
+        target_column: Column in `target_df` containing the values to be mapped.
+
+    Returns:
+        The target DataFrame with the new ID column added and the original
+        value column dropped, or None if an error occurs.
     """
     try:
         logger.info(f'Mapping {source_id_column}...')
@@ -246,10 +282,17 @@ def map_id_column(source_df: pd.DataFrame,
 
 def match_string(word: str, targets: list) -> str:
     """
-    Match a string with possible typos to a string in a target list based on similarity ratio score.
-    :param word: The string to be compared.
-    :param targets: The target strings to compare to.
-    :return: The best possible match.
+    Matches a string (potentially with typos) to the closest string in a target list.
+
+    Matching is based on the highest similarity ratio score. If the input
+    string is null (NaN), it returns 'n/a'.
+
+    Args:
+        word: The string to be compared.
+        targets: The list of target strings to compare against.
+
+    Returns:
+        The target string with the best possible match, or 'n/a'.
     """
 
     # Classify as 'not specified' if value is null.
@@ -270,9 +313,18 @@ def match_string(word: str, targets: list) -> str:
 
 def validate_ticker_format(df: pd.DataFrame) -> pd.Series:
     """
-    Validates ticker_symbol column values against pattern: 3 letters + 3 digits (i.e. stk182).
-    :param df: The dataframe with ticker column to be validated.
-    :return: Boolean.
+    Validates values in the 'ticker_symbol' column against the pattern:
+    three lowercase letters followed by three digits (e.g., 'stk182').
+
+    Also prints a summary of valid, invalid, and null counts, and lists
+    unique invalid values.
+
+    Args:
+        df: The DataFrame with the 'ticker_symbol' column to be validated.
+
+    Returns:
+        A boolean pandas Series indicating whether each row's 'ticker_symbol'
+        matches the required format.
     """
     pattern = r'^[a-z]{3}\d{3}$'
 
@@ -298,4 +350,3 @@ def validate_ticker_format(df: pd.DataFrame) -> pd.Series:
             print(f" - {val}")
 
     return is_valid
-
